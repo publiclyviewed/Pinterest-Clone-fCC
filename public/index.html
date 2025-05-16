@@ -8,10 +8,20 @@
 </head>
 <body>
     <h1>Welcome to the Pinterest Clone!</h1>
-    <p>This app lets you link and share images.</p>
+    <p>Browse images linked by our users.</p>
 
     <h2>Get Started</h2>
-    <p><a href="/auth/github">Login with GitHub to start linking images</a></p>
+    <p><a href="/auth/github">Login with GitHub to link your own images</a></p>
 
-    <script src="/js/script.js"></script> </body>
+    <hr>
+
+    <h2>Latest Images:</h2>
+    <div id="public-images-wall" class="grid">
+        </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    <script src="https://unpkg.com/masonry-layout@4/dist/masonry.pkgd.min.js"></script>
+    <script src="/js/homepage.js"></script>
+
+</body>
 </html>

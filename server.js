@@ -178,7 +178,7 @@ mongoose.connection.once('open', () => {
   // ---------------------------------------
 
 
-  // --- Image API Routes (Use async/await) ---
+  // --- Image API Routes (Authenticated) ---
 
   // Route to add a new image (requires authentication)
   app.post('/api/images', ensureAuthenticated, async (req, res) => {
@@ -259,8 +259,63 @@ mongoose.connection.once('open', () => {
       }
   });
 
+  // --- End Image API Routes (Authenticated) ---
 
-  // --- End Image API Routes ---
+
+  // --- Public Image API Routes (ADD THIS BLOCK HERE) ---
+
+  // Route to get ALL images (publicly accessible)
+  app.get('/api/images', async (req, res) => { // NO ensureAuthenticated middleware here
+      try {
+          // Find all images
+          const images = await Image.find({})
+                                 .sort({ createdAt: -1 }) // Sort by newest first
+                                 .populate('owner', 'username') // Populate owner's username
+                                 .exec();
+
+          console.log(`Found ${images.length} total images for public view.`);
+          res.json(images); // Send the array of images as JSON
+
+      } catch (err) {
+          console.error('Error fetching all images:', err);
+          res.status(500).json({ message: 'Error fetching images.', error: err.message });
+      }
+  });
+
+  // Optional: Route to get images for a specific user (publicly accessible)
+  app.get('/api/users/:userId/images', async (req, res) => { // NO ensureAuthenticated middleware
+      const userId = req.params.userId;
+
+      // Optional: Validate userId format
+      if (!mongoose.Types.ObjectId.isValid(userId)) {
+           return res.status(400).json({ message: 'Invalid user ID format.' });
+      }
+
+      try {
+          // Find images owned by the specified user ID
+          const images = await Image.find({ owner: userId })
+                                 .sort({ createdAt: -1 })
+                                 .populate('owner', 'username') // Populate owner's username
+                                 .exec();
+
+           // Optional: Check if user exists even if they have no images
+           const user = await User.findById(userId, 'username');
+           // If user not found AND no images found, return 404
+           if (!user && images.length === 0) {
+               return res.status(404).json({ message: 'User not found or user has no images.' });
+           }
+
+
+          console.log(`Found ${images.length} images for user ID ${userId} for public view.`);
+          res.json(images); // Send the array of images as JSON
+
+      } catch (err) {
+          console.error(`Error fetching images for user ${userId}:`, err);
+          res.status(500).json({ message: 'Error fetching images for user.', error: err.message });
+      }
+  });
+
+  // --- End Public Image API Routes ---
 
 
   // Start the server - This should remain inside the mongoose connection.once('open', ...) block
