@@ -23,7 +23,7 @@ A Pinterest clone built as a coding interview preparation challenge, fulfilling 
 
 1.  **Clone the repository:**
     ```bash
-    git clone <repository-url> # Replace with your repo URL once pushed to Git
+    git clone 
     cd pinterest-clone
     ```
 2.  **Install dependencies:**

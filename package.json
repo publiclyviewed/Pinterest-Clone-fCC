@@ -12,7 +12,12 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "dotenv": "^16.5.0",
     "express": "^5.1.0",
+    "express-session": "^1.18.1",
+    "mongoose": "^8.14.3",
+    "passport": "^0.7.0",
+    "passport-github2": "^0.1.12",
     "pinterest-clone": "file:"
   },
   "devDependencies": {
