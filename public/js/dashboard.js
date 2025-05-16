@@ -9,6 +9,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // Variable to hold the Masonry instance
     let masonryInstance = null;
 
+    // --- Placeholder Image URL ---
+    // Use a placeholder service or a local image URL
+    const BROKEN_IMAGE_PLACEHOLDER = 'https://via.placeholder.com/200x150.png?text=Broken+Image';
+    // -----------------------------
+
     // --- Masonry Initialization ---
 
     // Function to initialize or re-layout Masonry
@@ -28,8 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
          // Only initialize if there are items to lay out
          const gridItems = myImagesWall.querySelectorAll('.grid-item');
          if (gridItems.length > 0) {
-             // Initialize Masonry after images are added
-             // Use imagesLoaded functionality provided by masonry.pkgd.js
+             // Initialize Masonry on the container
              masonryInstance = new Masonry( myImagesWall, {
                // options
                itemSelector: '.grid-item', // Selector for grid items
@@ -41,13 +45,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
              // Optional: Listen for layout complete
               masonryInstance.on('layoutComplete', function() {
-                console.log('Masonry layout complete');
+                console.log('Dashboard Masonry layout complete');
               });
 
-             // Initial layout
+             // Initial layout (Masonry pkgd often handles image loading before initial layout)
+             // If layout is off on load, you might need an explicit imagesLoaded call here
+             // For simplicity, let's just call layout. Masonry pkgd often waits.
              masonryInstance.layout();
          } else {
-             console.log('No grid items to initialize Masonry.');
+             console.log('No dashboard grid items to initialize Masonry.');
          }
     }
 
@@ -90,6 +96,30 @@ document.addEventListener('DOMContentLoaded', () => {
          imgElement.style.display = 'block'; // Prevents extra space below image
          // imgElement.style.maxWidth = '100%'; // Handled by CSS
 
+
+         // --- Add Error Handling for Broken Images ---
+         // Use jQuery to select the image element and attach the error handler
+         $(imgElement).on('error', function() {
+             console.error('Image failed to load:', this.src);
+             // Replace the source with the placeholder image
+             this.src = BROKEN_IMAGE_PLACEHOLDER;
+             // Optional: Add a class for styling broken images if needed
+             $(this).addClass('broken-image');
+
+             // Important: Tell Masonry to relayout the item, as the size might change
+             // Find the grid item container (using $(this).closest for robustness)
+             const parentGridItem = $(this).closest('.grid-item')[0]; // Get the raw DOM element
+             if (masonryInstance && parentGridItem) {
+                 // Simple relayout is often sufficient if only the size changes.
+                 masonryInstance.layout();
+                 // If layout seems off, try:
+                 // masonryInstance.reloadItems();
+                 // masonryInstance.layout();
+             }
+         });
+         // ---------------------------------------------
+
+
          gridItem.appendChild(imgElement);
 
          // Add description below the image (optional)
@@ -105,7 +135,7 @@ document.addEventListener('DOMContentLoaded', () => {
          deleteButton.textContent = 'Delete';
          deleteButton.className = 'delete-button'; // Add class for styling/selection
          // Styles handled by CSS .delete-button
-         deleteButton.dataset.imageId = image._id; // Add image ID to button too (optional, but convenient)
+         deleteButton.dataset.imageId = image._id; // Add image ID to button too (optional, but convenient for event delegation)
          gridItem.appendChild(deleteButton);
 
          return gridItem;
@@ -146,6 +176,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             // Initialize or reload Masonry after adding all items
+            // Masonry pkgd version waits for images to load before initial layout
             initializeMasonry();
 
         } catch (error) {
@@ -174,10 +205,10 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Optional: Basic URL validation regex
+        // Optional: Basic URL validation regex (can be more robust)
         const urlPattern = /^(https?:\/\/.*\.(?:png|jpg|jpeg|gif|svg|webp))$/i;
          if (!urlPattern.test(url)) {
-             alert('Please enter a valid image URL (png, jpg, gif, svg, webp).');
+             alert('Please enter a valid image URL (png, jpg, gif, svg, webp) starting with http or https.');
              return;
          }
 
@@ -216,10 +247,9 @@ document.addEventListener('DOMContentLoaded', () => {
             myImagesWall.appendChild(gridItem);
 
             // Tell Masonry to add and layout the new item
-            // Use imagesLoaded implicitly via Masonry pkgd, or explicitly
-            // Masonry's 'appended' often triggers image loading and layout automatically
-            // but explicitly waiting for the image load is more robust.
-            const img = gridItem.querySelector('img');
+            // Use imagesLoaded implicitly via Masonry pkgd, or explicitly wait for image load
+            // Explicitly waiting for the image load is more robust if the image size affects layout significantly
+             const img = gridItem.querySelector('img');
 
             // Check if image is already loaded or wait for load/error
             if (img.complete) {
@@ -233,21 +263,15 @@ document.addEventListener('DOMContentLoaded', () => {
                      if (masonryInstance) masonryInstance.appended(gridItem);
                      else initializeMasonry(); // Initialize if this is the first item
                  });
-                 // Handle error loading new image - remove it
-                  img.addEventListener('error', function() {
-                     console.error('New image failed to load:', img.src);
-                     alert(`Failed to load image: ${img.src}`);
-                     if (gridItem.parentNode) { // Check if it's still in the DOM
-                         if (masonryInstance) masonryInstance.remove(gridItem); // Remove using Masonry
-                         else gridItem.remove(); // Plain DOM removal
-                         if (masonryInstance) masonryInstance.layout(); // Relayout
-                     }
-                 });
-            }
+                 // Error handling for image load (this is already handled by the $(imgElement).on('error', ...) above)
+                 // We don't need to explicitly remove here again usually.
+                 // img.addEventListener('error', function() { ... });
+             }
 
 
             // Re-initialize Masonry if this was the first item added
-             if (gridItems.length === 0 && !masonryInstance) { // Check before the new item is added
+             const currentGridItems = myImagesWall.querySelectorAll('.grid-item');
+             if (currentGridItems.length === 1 && !masonryInstance) { // Check after the new item is added but before append/load logic
                  // This case is handled inside the load/complete check now
              }
 
@@ -260,6 +284,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // --- Event Delegation for Delete Buttons ---
+    // Use event delegation on the container since items are added/removed dynamically
     myImagesWall.addEventListener('click', async (event) => {
         // Check if the clicked element is a delete button or inside one
         const deleteButton = event.target.closest('.delete-button');
@@ -312,9 +337,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     masonryInstance.remove(gridItem); // Remove using Masonry
                     masonryInstance.layout(); // Trigger layout update
                  } else {
-                     gridItem.remove(); // If Masonry wasn't initialized for some reason, just remove it from DOM
+                     // If Masonry wasn't initialized for some reason, just remove it from DOM
+                     gridItem.remove();
                  }
-
 
                 // Optional: Display success message
                 // alert('Image deleted successfully!'); // Or show a less intrusive notification
