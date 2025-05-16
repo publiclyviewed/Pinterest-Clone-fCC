@@ -5,16 +5,19 @@ const mongoose = require('mongoose');
 const session = require('express-session');
 const passport = require('passport');
 const GitHubStrategy = require('passport-github2').Strategy;
+const path = require('path'); // Required for res.sendFile
 
 const User = require('./models/User');
-const Image = require('./models/Image'); // Make sure Image model is imported
+const Image = require('./models/Image');
 
 const app = express();
 const port = process.env.PORT || 3000;
 
 // --- Express Middleware ---
-app.use(express.json());
+// Parse URL-encoded bodies (as sent by HTML forms)
 app.use(express.urlencoded({ extended: true }));
+// Parse JSON bodies (as sent by API clients)
+app.use(express.json());
 // --------------------------
 
 
@@ -29,33 +32,36 @@ mongoose.connection.once('open', () => {
   // --- Express Session Middleware ---
   app.use(session({
     secret: process.env.SESSION_SECRET,
-    resave: false,
-    saveUninitialized: false,
-    // store: ...
+    resave: false, // Don't save session if unmodified
+    saveUninitialized: false, // Don't create session until something stored
+    // Recommended: use a database session store for production (e.g., connect-mongo)
+    // store: new MongoStore({ mongooseConnection: mongoose.connection })
   }));
   // ----------------------------------
 
   // --- Passport Middleware ---
+  // Initialize Passport
   app.use(passport.initialize());
+  // Use passport.session() to use the session middleware
   app.use(passport.session());
   // ---------------------------
 
   // --- Passport Configuration ---
 
-  // Serialize user (Callback style still works here)
+  // Serialize user: Determines what user data is stored in the session
   passport.serializeUser((user, done) => {
     console.log('Serializing user:', user.id);
-    done(null, user.id);
+    done(null, user.id); // Store the MongoDB user ID in the session
   });
 
-  // Deserialize user (Use Promises)
+  // Deserialize user: Retrieves the full user object based on session data
   passport.deserializeUser((id, done) => {
     console.log('Deserializing user with ID:', id);
-    // Use .then().catch() with findById which returns a Promise
+    // Find the user in the database by their MongoDB ID using Promises
     User.findById(id)
       .then(user => {
         console.log('Deserialized user:', user);
-        done(null, user); // Pass the user to done
+        done(null, user); // Attach the full user object to req.user
       })
       .catch(err => {
         console.error('Error deserializing user:', err);
@@ -63,23 +69,23 @@ mongoose.connection.once('open', () => {
       });
   });
 
-
-  // Configure the GitHub Strategy (Use async/await in the verify callback)
+  // Configure the GitHub Strategy
   passport.use(new GitHubStrategy({
-      clientID: process.env.GITHUB_CLIENT_ID,
-      clientSecret: process.env.GITHUB_CLIENT_SECRET,
-      callbackURL: "http://localhost:3000/auth/github/callback"
+      clientID: process.env.GITHUB_CLIENT_ID, // From your .env file
+      clientSecret: process.env.GITHUB_CLIENT_SECRET, // From your .env file
+      callbackURL: "http://localhost:3000/auth/github/callback", // Must match GitHub OAuth App settings
+      // passReqToCallback: true // Needed if you want to access req in verify callback
     },
     // Verify callback function using async/await
     async function(accessToken, refreshToken, profile, done) {
       console.log('GitHub profile received:', profile);
 
       try {
-        // Find user using await with findOne
+        // Find user by GitHub ID using await
         let user = await User.findOne({ githubId: profile.id });
 
         if (user) {
-          // User already exists
+          // User already exists, log them in
           console.log('Existing user found:', user.username);
           return done(null, user);
         } else {
@@ -88,10 +94,13 @@ mongoose.connection.once('open', () => {
           const newUser = new User({
             githubId: profile.id,
             username: profile.username,
-            // ... other fields
+            // Add other profile fields if you defined them in the schema
+            // displayName: profile.displayName,
+            // profileUrl: profile.profileUrl,
+            // avatarUrl: profile.photos && profile.photos.length > 0 ? profile.photos[0].value : null,
           });
 
-          // Save new user using await with save
+          // Save new user using await
           user = await newUser.save();
           console.log('New user saved:', user.username);
           return done(null, user);
@@ -104,56 +113,67 @@ mongoose.connection.once('open', () => {
   ));
   // ------------------------------------------
 
-  // --- Middleware to Check Authentication (Keep this) ---
+  // --- Middleware to Check Authentication ---
+  // Custom middleware function to restrict access to authenticated users
   function ensureAuthenticated(req, res, next) {
-    if (req.isAuthenticated()) {
-      return next();
+    if (req.isAuthenticated()) { // Passport adds isAuthenticated() to req
+      return next(); // User is logged in, proceed
     }
-    // User is not logged in, redirect them
+    // User is not logged in, redirect to login
     res.redirect('/auth/github');
-    // Or for API routes: res.status(401).json({ message: 'Unauthorized' });
+    // Or for API routes: res.status(401).json({ message: 'Unauthorized: Please log in.' });
   }
-  // --------------------------------------------------
+  // ------------------------------------------
 
 
   // Serve static files from the 'public' directory
+  // This should typically be placed after middleware, but before specific routes
   app.use(express.static('public'));
 
 
-  // --- Authentication Routes (Keep these) ---
-  app.get('/auth/github', passport.authenticate('github', { scope: ['user:email'] }));
+  // --- Authentication Routes ---
+
+  // Route to start the GitHub login process
+  app.get('/auth/github',
+    passport.authenticate('github', { scope: ['user:email'] })); // Request email scope
+
+  // Route that GitHub redirects back to after login
   app.get('/auth/github/callback',
-    passport.authenticate('github', { failureRedirect: '/' }),
-    (req, res) => { res.redirect('/dashboard'); }
+    passport.authenticate('github', { failureRedirect: '/' }), // Redirect home on failure
+    (req, res) => {
+      // Successful authentication, redirect to the dashboard
+      console.log('GitHub authentication successful, redirecting to dashboard...');
+      res.redirect('/dashboard');
+    }
   );
+
+  // Simple logout route
   app.get('/logout', (req, res) => {
-      req.logout(() => {
+      // req.logout() requires a callback in newer versions of Passport
+      req.logout((err) => {
+          if (err) {
+              console.error('Error during logout:', err);
+              return next(err); // Pass error to error handler
+          }
           console.log('User logged out');
-          res.redirect('/');
+          res.redirect('/'); // Redirect to homepage after logout
       });
   });
+
+  // Helper route to check auth status and get user info (returns JSON)
   app.get('/profile', (req, res) => {
-    if (req.isAuthenticated()) { res.json({ isAuthenticated: true, user: req.user }); }
-    else { res.json({ isAuthenticated: false }); }
+    if (req.isAuthenticated()) {
+        // Return JSON including authentication status and user object
+        res.json({ isAuthenticated: true, user: req.user });
+    } else {
+        res.json({ isAuthenticated: false });
+    }
   });
+
+  // Dashboard route - requires authentication and serves dashboard.html
   app.get('/dashboard', ensureAuthenticated, (req, res) => {
-      res.send(`
-          <h1>Welcome to your dashboard, ${req.user.username}!</h1>
-          <p>User ID: ${req.user.id}</p>
-          <p><a href="/logout">Logout</a></p>
-          <hr>
-          <h2>Add a new image:</h2>
-          <form id="add-image-form">
-              Image URL: <input type="text" id="image-url" name="url" required><br><br>
-              Description: <input type="text" id="image-description" name="description"><br><br>
-              <button type="submit">Add Image</button>
-          </form>
-          <hr>
-          <h2>Your Images:</h2>
-          <div id="my-images-wall">
-              </div>
-          <script src="/js/dashboard.js"></script>
-          <script src="https://unpkg.com/masonry-layout@4/dist/masonry.pkgd.min.js"></script> <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script> `); // Added script tags for dashboard.js, Masonry, and jQuery here
+      // Use res.sendFile to serve the dashboard HTML file
+      res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
   });
   // ---------------------------------------
 
@@ -161,47 +181,84 @@ mongoose.connection.once('open', () => {
   // --- Image API Routes (Use async/await) ---
 
   // Route to add a new image (requires authentication)
-  app.post('/api/images', ensureAuthenticated, async (req, res) => { // Make route handler async
+  app.post('/api/images', ensureAuthenticated, async (req, res) => {
       const { url, description } = req.body;
 
+      // Basic validation
       if (!url) {
           return res.status(400).json({ message: 'Image URL is required.' });
       }
 
       try {
+          // Create a new Image document, linking it to the logged-in user
           const newImage = new Image({
               url: url,
               description: description,
-              owner: req.user._id // Use logged-in user's ID
+              owner: req.user._id // Use logged-in user's ID from req.user
           });
 
           // Save the image using await
           const savedImage = await newImage.save();
           console.log('Image saved:', savedImage);
-          res.status(201).json(savedImage);
+          res.status(201).json(savedImage); // Send the saved image data back
 
       } catch (err) {
           console.error('Error saving image:', err);
-          res.status(500).json({ message: 'Error saving image.', error: err });
+          // Check for Mongoose validation errors (optional)
+          if (err.name === 'ValidationError') {
+               return res.status(400).json({ message: err.message });
+          }
+          res.status(500).json({ message: 'Error saving image.', error: err.message });
       }
   });
 
   // Route to get images for the logged-in user (requires authentication)
-  app.get('/api/my-images', ensureAuthenticated, async (req, res) => { // Make route handler async
+  app.get('/api/my-images', ensureAuthenticated, async (req, res) => {
       try {
-          // Find images using await with find and exec
+          // Find all images owned by the logged-in user, sort by creation date
           const images = await Image.find({ owner: req.user._id })
                                    .sort({ createdAt: -1 })
-                                   .exec(); // .exec() is optional but good practice with async/await queries
+                                   .exec(); // Use .exec() with await
 
           console.log(`Found ${images.length} images for user ${req.user.username}`);
-          res.json(images);
+          res.json(images); // Send the array of images as JSON
 
       } catch (err) {
           console.error('Error fetching user images:', err);
-          res.status(500).json({ message: 'Error fetching images.', error: err });
+          res.status(500).json({ message: 'Error fetching images.', error: err.message });
       }
   });
+
+  // Route to delete an image (requires authentication and ownership)
+  app.delete('/api/images/:imageId', ensureAuthenticated, async (req, res) => {
+      const imageId = req.params.imageId; // Get the image ID from the URL
+
+      try {
+          // Find the image by ID and owner, then delete it using await
+          const deletedImage = await Image.findOneAndDelete({
+              _id: imageId,        // Image ID matches the one in the URL param
+              owner: req.user._id  // Owner matches the logged-in user's ID
+          });
+
+          if (!deletedImage) {
+              // Image not found or logged-in user is not the owner
+              console.warn(`Attempted to delete image ${imageId} by user ${req.user.id} but failed (not found or no ownership).`);
+              return res.status(404).json({ message: 'Image not found or you do not have permission to delete it.' });
+          }
+
+          console.log('Image deleted:', deletedImage._id, 'by user:', req.user.username);
+          res.status(200).json({ message: 'Image deleted successfully.', deletedImageId: deletedImage._id });
+
+      } catch (err) {
+          console.error('Error deleting image:', err);
+          // Check for invalid ObjectId format error
+          if (err.name === 'CastError' && err.kind === 'ObjectId') {
+               return res.status(400).json({ message: 'Invalid image ID format.' });
+          }
+          res.status(500).json({ message: 'Error deleting image.', error: err.message });
+      }
+  });
+
 
   // --- End Image API Routes ---
 
@@ -212,8 +269,21 @@ mongoose.connection.once('open', () => {
   });
 });
 
+// Listen for Mongoose connection errors AFTER the initial attempt
 mongoose.connection.on('error', (err) => {
   console.error('MongoDB connection error:', err);
+  // Mongoose will try to reconnect, but you might want more robust error handling in production
 });
 
-// ... other requires at the top ...
+// Optional: Handle unhandled promise rejections
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  // Application specific logging, throwing an error, or other logic here
+});
+
+// Optional: Handle uncaught exceptions
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+  // Consider gracefully shutting down or restarting the process in production
+  process.exit(1); // Exit the process
+});

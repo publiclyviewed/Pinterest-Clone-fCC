@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Dashboard - Pinterest Clone</title>
+    <link rel="stylesheet" href="/css/style.css">
+    </head>
+<body>
+    <h1>Your Dashboard</h1>
+    <p id="welcome-message"></p>
+    <p><a href="/logout">Logout</a></p>
+    <hr>
+
+    <h2>Add a new image:</h2>
+    <form id="add-image-form">
+        Image URL: <input type="text" id="image-url" name="url" required><br><br>
+        Description: <input type="text" id="image-description" name="description"><br><br>
+        <button type="submit">Add Image</button>
+    </form>
+    <hr>
+
+    <h2>Your Images:</h2>
+    <div id="my-images-wall" class="grid">
+        </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    <script src="https://unpkg.com/masonry-layout@4/dist/masonry.pkgd.min.js"></script>
+    <script src="/js/dashboard.js"></script> </body>
+</html>

@@ -1,0 +1,123 @@
+/* Basic global styles */
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol';
+    margin: 0;
+    padding: 20px;
+    background-color: #f8f8f8;
+    color: #333;
+}
+
+h1, h2, h3 {
+    color: #555;
+}
+
+a {
+    color: #007bff;
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+hr {
+    border: none;
+    height: 1px;
+    background-color: #ddd;
+    margin: 20px 0;
+}
+
+/* Styles for the dashboard grid */
+.grid {
+   /* Masonry container - no specific display needed */
+   /* Optional: Center the container if using fitWidth */
+   /* margin: 0 auto; */
+   background: #fff; /* Optional: background for the grid area */
+   padding: 10px; /* Padding around the grid */
+   border-radius: 8px;
+   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Styles for individual grid items (each image and its info) */
+.grid-item {
+  /* This width is crucial and should match Masonry columnWidth */
+  width: 200px;
+  margin-bottom: 10px; /* Space between rows */
+  /* Add border/background to visualize items */
+   border: 1px solid #eee;
+   background: #fff;
+   padding: 8px;
+   box-sizing: border-box; /* Include padding and border in the element's total width and height */
+   border-radius: 4px;
+   box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+/* Ensure images fill their item width and maintain aspect ratio */
+.grid-item img {
+    display: block; /* Remove extra space below image */
+    max-width: 100%; /* Ensure image doesn't exceed its container width */
+    height: auto; /* Maintain aspect ratio */
+    border-radius: 4px;
+}
+
+/* Optional styles for description text */
+.grid-item p {
+    margin-top: 8px;
+    margin-bottom: 0;
+    font-size: 0.9em;
+    color: #666;
+    word-break: break-word; /* Prevent long words from overflowing */
+}
+
+/* Styles for the delete button */
+.delete-button {
+    display: block; /* Make button take full width of item */
+    width: 100%;
+    background-color: #f44336; /* Red background */
+    color: white;
+    border: none;
+    padding: 8px 10px;
+    text-align: center;
+    text-decoration: none;
+    font-size: 14px;
+    margin-top: 8px; /* Space above the button */
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background-color 0.3s ease; /* Smooth hover effect */
+}
+
+.delete-button:hover {
+    background-color: #d32f2f; /* Darker red on hover */
+}
+
+/* Basic form styling (optional) */
+#add-image-form input[type="text"] {
+    width: calc(100% - 16px); /* Adjust width accounting for padding */
+    padding: 8px;
+    margin-bottom: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box; /* Include padding in width */
+}
+
+#add-image-form button[type="submit"] {
+    background-color: #5cb85c; /* Green color */
+    color: white;
+    padding: 10px 15px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background-color 0.3s ease;
+}
+
+#add-image-form button[type="submit"]:hover {
+     background-color: #4cae4c; /* Darker green on hover */
+}
+
+/* Clearfix helper for Masonry container if needed (less common with modern CSS) */
+.grid::after {
+  content: '';
+  display: block;
+  clear: both;
+}
